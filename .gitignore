@@ -7,3 +7,5 @@ test/
 model.png
 logs/
 __pycache__/
+data/
+*checkpoint.ipynb
