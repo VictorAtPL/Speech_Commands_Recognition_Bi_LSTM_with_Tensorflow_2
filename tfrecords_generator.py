@@ -14,10 +14,7 @@ import scipy
 import tensorflow as tf
 from tqdm import tqdm
 
-TFRECORDS_FORMAT_PATTERN = '{}-{}-of-{}.tfrecords'
-KAGGLE_LABELS = ["yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go", "silence", "unknown"]
-TRAIN_AUDIO_PATH = "train/audio"
-TFRECORDS_SAVE_PATH = "tfrecords"
+from constants import TFRECORDS_FORMAT_PATTERN, KAGGLE_LABELS, TRAIN_AUDIO_PATH, TFRECORDS_SAVE_PATH
 
 
 def get_train_examples_sets():
