@@ -5,5 +5,4 @@ train/
 test/
 *.pickle
 model.png
-logs/
 __pycache__/

@@ -154,7 +154,7 @@ def convert_wavs_to_tfrecords(part_files, output_path, set_name, file_pattern, t
 
     part_no, part_files = part_files
     try:
-        with tf.python_io.TFRecordWriter(
+        with tf.io.TFRecordWriter(
                 os.path.join(output_path, file_pattern.format(set_name, part_no, number_of_shards))) as writer:
             for filename in tqdm(list(reversed(part_files)), position=part_no):
                 label = filename.split("/")[0]
@@ -200,10 +200,9 @@ def convert_wavs_to_tfrecords(part_files, output_path, set_name, file_pattern, t
 
 
 def generate_tfrecords_for_dataset(path, examples_sets, train_audio_path, id_to_labels, labels_to_id):
-    if tf.gfile.Exists(path):
-        tf.gfile.DeleteRecursively(path)
-
-    tf.gfile.MakeDirs(path)
+    if tf.io.gfile.exists(path):
+        tf.io.gfile.rmtree(path)
+    tf.io.gfile.makedirs(path)
 
     for set_name, example_set in examples_sets.items():
         # if 'train' not in set_name:
@@ -215,10 +214,10 @@ def generate_tfrecords_for_dataset(path, examples_sets, train_audio_path, id_to_
 
 
 def write_labels(path, id_to_labels, labels_to_id):
-    with tf.gfile.Open(os.path.join(path, "id_to_labels.pickle"), mode='wb') as f:
+    with tf.io.gfile.GFile(os.path.join(path, "id_to_labels.pickle"), mode='wb') as f:
         pickle.dump(id_to_labels, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    with tf.gfile.Open(os.path.join(path, "labels_to_id.pickle"), mode='wb') as f:
+    with tf.io.gfile.GFile(os.path.join(path, "labels_to_id.pickle"), mode='wb') as f:
         pickle.dump(labels_to_id, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -227,7 +226,7 @@ def write_sets_length(path, merged_examples_sets):
     examples_sets_class_count = get_class_count_per_sets(merged_examples_sets)
     sum_sets_split = get_sum_sets_split(examples_sets_class_count)
 
-    with tf.gfile.Open(os.path.join(path, "sets_count.pickle"), mode='wb') as f:
+    with tf.io.gfile.GFile(os.path.join(path, "sets_count.pickle"), mode='wb') as f:
         pickle.dump(sum_sets_split.to_dict(), f, protocol=pickle.HIGHEST_PROTOCOL)
 
 

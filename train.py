@@ -86,8 +86,8 @@ def run_training(args):
         model = model_module.get_model()
 
         if 'pydot' in sys.modules:
-            tf.keras.utils.plot_model(model, to_file='model.png', show_shapes=True)
-            im = Image.open('model.png')
+            tf.keras.utils.plot_model(model, to_file=args.model + '.png', show_shapes=True)
+            im = Image.open(args.model + '.png')
             plt.figure(figsize=(10, 40))
             plt.imshow(im)
 
@@ -120,7 +120,7 @@ def is_valid_file(parser, arg):
         return open(arg, 'r')  # return an open file handle
 
 
-def main():
+def main(args):
     parser = ArgumentParser(description='MGU project #3 & DL-MAI project #2 (RNN) training script.')
 
     available_models = [model_name.split("/")[1] for model_name in glob("models/*/model.py")]
@@ -130,10 +130,14 @@ def main():
     parser.add_argument('--batch-size', default=1024, type=int)
     parser.add_argument('--base-lr', default=0.005, type=float)
 
-    args = parser.parse_args()
+    if args is not None:
+        args = parser.parse_args(args)
+    else:
+        args = parser.parse_args()
 
     run_training(args)
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+    main(sys.argv[1:])
