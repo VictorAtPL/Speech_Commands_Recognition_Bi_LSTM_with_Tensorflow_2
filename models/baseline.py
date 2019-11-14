@@ -1,7 +1,8 @@
 import tensorflow as tf
 
 from AbstractModel import AbstractModel
-from common import get_input_fn_and_steps_per_epoch, load_sets_count, mel_spectrogram_parser
+from common import get_input_fn_and_steps_per_epoch, load_sets_count, mel_spectrogram_unlabeled_parser, \
+    mel_spectrogram_labeled_parser
 from constants import TFRECORDS_SAVE_PATH
 
 
@@ -43,9 +44,14 @@ class Model(AbstractModel):
 
         return tf.keras.Model(inputs=input_op, outputs=output_op)
 
-    def get_input_fn_and_steps_per_epoch(self, set_name, batch_size):
+    def get_input_fn_and_steps_per_epoch(self, set_name, batch_size=None):
         sets_count = load_sets_count()
 
-        return get_input_fn_and_steps_per_epoch(set_name, mel_spectrogram_parser, TFRECORDS_SAVE_PATH,
+        parser_fn = mel_spectrogram_labeled_parser
+
+        if 'prediction' in set_name:
+            parser_fn = mel_spectrogram_unlabeled_parser
+
+        return get_input_fn_and_steps_per_epoch(set_name, parser_fn, TFRECORDS_SAVE_PATH,
                                                 batch_size, sets_count)
 
