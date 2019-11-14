@@ -120,7 +120,7 @@ def is_valid_file(parser, arg):
         return open(arg, 'r')  # return an open file handle
 
 
-def main(args):
+def main():
     parser = ArgumentParser(description='MGU project #3 & DL-MAI project #2 (RNN) training script.')
 
     available_models = [model_name.split("/")[1] for model_name in glob("models/*/model.py")]
@@ -130,14 +130,9 @@ def main(args):
     parser.add_argument('--batch-size', default=1024, type=int)
     parser.add_argument('--base-lr', default=0.005, type=float)
 
-    if args is not None:
-        args = parser.parse_args(args)
-    else:
-        args = parser.parse_args()
-
+    args = parser.parse_args()
     run_training(args)
 
 
 if __name__ == '__main__':
-    import sys
-    main(sys.argv[1:])
+    main()

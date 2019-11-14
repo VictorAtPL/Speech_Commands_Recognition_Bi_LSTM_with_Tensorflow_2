@@ -4,5 +4,4 @@ tfrecords/
 train/
 test/
 *.pickle
-model.png
 __pycache__/
