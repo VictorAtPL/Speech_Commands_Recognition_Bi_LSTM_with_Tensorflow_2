@@ -1,0 +1,18 @@
+class DefaultDistributeStrategy:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    @staticmethod
+    def scope():
+        class Scope:
+            def __enter__(self):
+                pass
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        return Scope()
+
