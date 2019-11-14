@@ -1,91 +1,113 @@
-import numpy as np
-from keras.utils import Sequence
-from keras.utils.np_utils import to_categorical
+import math
+import os
+import sys
+from argparse import ArgumentParser
+from datetime import datetime
+from glob import glob
+from importlib import import_module
 
-from keras.models import Model
-from keras.utils import plot_model
-from keras.layers import Input, Dense, BatchNormalization, LSTM, Activation, Dropout
-
-from keras.optimizers import Adam
-
+import tensorflow as tf
 from PIL import Image
 from matplotlib import pyplot as plt
 
-
-class SpeechCommandsSequence(Sequence):
-
-    def __init__(self, x_set, y_set, batch_size):
-        self.x, self.y = x_set, y_set
-        self.batch_size = batch_size
-
-    def __len__(self):
-        #         return np.ceil(len(self.x) / float(self.batch_size))
-        return 1024
-
-    def __getitem__(self, idx):
-        #         batch_x = self.x[idx * self.batch_size:(idx + 1) * self.batch_size]
-        #         batch_y = self.y[idx * self.batch_size:(idx + 1) * self.batch_size]
-
-        #         return np.array([
-        #             resize(imread(file_name), (200, 200))
-        #                for file_name in batch_x]), np.array(batch_y)
-
-        return np.random.randn(self.batch_size, 128, 44), \
-               to_categorical(np.random.randint(12, size=self.batch_size), num_classes=12)
+from DefaultDistributeStrategy import DefaultDistributeStrategy
+from callbacks.TensorBoard import MyTensorBoardCallback
 
 
-def get_model():
-    input_op = Input(shape=(128, 44))
+def run_training(args):
+    gpu_list = tf.config.experimental.list_physical_devices('GPU')
 
-    # BATCH_NORM
-    x = BatchNormalization()(input_op)
+    if gpu_list:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpu_list:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            print(len(gpu_list), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            print(e)
 
-    # LSTM
-    x = LSTM(256)(x)
+    # tf.config.experimental_run_functions_eagerly(True)
 
-    # BATCH_NORM
-    x = BatchNormalization()(x)
+    batch_size = args.batch_size
 
-    # DENSE
-    x = Dense(256)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.3)(x)
+    model_class = import_module("models.{}".format(args.model)).Model()
 
-    # DENSE
-    x = Dense(128)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.3)(x)
+    time = datetime.now().strftime('%d%m%Y_%H%M%S')
 
-    # DENSE
-    x = Dense(64)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.3)(x)
+    def make_scheduler(lr):
+        def scheduler(epoch):
+            if epoch < 10:
+                return lr
+            else:
+                return lr * float(math.exp(0.1 * (10 - epoch)))
+        return scheduler
 
-    output_op = Dense(12)(x)
+    model_logs_dir_name = "{}-{}".format(time, args.model)
 
-    return Model(inputs=input_op, outputs=output_op)
+    strategy = tf.distribute.MirroredStrategy() if len(gpu_list) > 1 else DefaultDistributeStrategy()
+    with strategy.scope():
+        model = model_class.get_model()
+
+        if 'pydot' in sys.modules:
+            tf.keras.utils.plot_model(model, to_file=args.model + '.png', show_shapes=True)
+            im = Image.open(args.model + '.png')
+            plt.figure(figsize=(10, 40))
+            plt.imshow(im)
+
+        callbacks = [MyTensorBoardCallback(args, log_dir=os.path.join('logs', model_logs_dir_name),
+                                           profile_batch=0,
+                                           update_freq='epoch',
+                                           write_graph=False),
+                     tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join('logs', model_logs_dir_name, args.model),
+                                                        monitor='val_sparse_categorical_accuracy',
+                                                        mode='max',
+                                                        verbose=1,
+                                                        save_best_only=True,
+                                                        save_weights_only=True,
+                                                        save_freq='epoch')]
+
+        if args.use_lr_scheduler:
+            callbacks.append(tf.keras.callbacks.LearningRateScheduler(make_scheduler(args.lr)))
+
+        if args.use_early_stopping:
+            callbacks.append(tf.keras.callbacks.EarlyStopping(monitor='val_sparse_categorical_accuracy',
+                                                              patience=args.early_stopping_patience,
+                                                              min_delta=args.early_stopping_min_delta))
+
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=args.lr),
+            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()]
+        )
+
+    train_generator, train_steps_per_epoch = \
+        model_class.get_input_fn_and_steps_per_epoch('train', batch_size)
+    validation_generator, validation_steps_per_epoch = \
+        model_class.get_input_fn_and_steps_per_epoch('validation', batch_size)
+
+    model.fit(train_generator, steps_per_epoch=train_steps_per_epoch, epochs=args.epochs, callbacks=callbacks,
+              validation_data=validation_generator, validation_steps=validation_steps_per_epoch,
+              validation_freq=[1, 2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100])
 
 
 def main():
-    model = get_model()
+    parser = ArgumentParser(description='DL-MAI project #2 (RNN) training script.')
 
-    # plot_model(model, to_file='model.png', show_shapes=True)
-    # im = Image.open('model.png')
-    # plt.figure(figsize=(10, 40))
-    # plt.imshow(im)
+    available_models = [model_name.split("/")[1].split(".")[0] for model_name in glob("models/*.py")]
+    parser.add_argument('model', choices=available_models)
+    parser.add_argument('--comment', type=str)
+    parser.add_argument('--epochs', default=50, type=int)
+    parser.add_argument('--batch-size', default=1024, type=int)
+    parser.add_argument('--lr', default=0.0001, type=float)
+    parser.add_argument('--use_lr_scheduler', action='store_true')
+    parser.add_argument('--use_early_stopping', action='store_true')
+    parser.add_argument('--early_stopping_patience', type=int, default=5)
+    parser.add_argument('--early_stopping_min_delta', type=float, default=0.005)
 
-    model.compile(
-        optimizer=Adam(),
-        loss='categorical_crossentropy',
-        metrics=['accuracy']
-    )
-
-    batch_size = 16
-    generator = SpeechCommandsSequence([], [], batch_size)
-    model.fit_generator(generator=generator, steps_per_epoch=len(generator))
+    args = parser.parse_args()
+    run_training(args)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,7 @@
+*.sh
+.idea/
+tfrecords/
+train/
+test/
+*.pickle
+__pycache__/
