@@ -46,7 +46,7 @@ def run_training(args):
 
     model_logs_dir_name = "{}-{}".format(time, args.model)
 
-    strategy = tf.distribute.MirroredStrategy() if gpu_list else DefaultDistributeStrategy()
+    strategy = tf.distribute.MirroredStrategy() if len(gpu_list) > 1 else DefaultDistributeStrategy()
     with strategy.scope():
         model = model_class.get_model()
 
@@ -59,7 +59,14 @@ def run_training(args):
         callbacks = [MyTensorBoardCallback(args, log_dir=os.path.join('logs', model_logs_dir_name),
                                            profile_batch=0,
                                            update_freq='epoch',
-                                           write_graph=False)]
+                                           write_graph=False),
+                     tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join('logs', model_logs_dir_name, args.model),
+                                                        monitor='val_sparse_categorical_accuracy',
+                                                        mode='max',
+                                                        verbose=1,
+                                                        save_best_only=True,
+                                                        save_weights_only=True,
+                                                        save_freq='epoch')]
 
         if args.use_lr_scheduler:
             callbacks.append(tf.keras.callbacks.LearningRateScheduler(make_scheduler(args.lr)))
@@ -86,7 +93,7 @@ def run_training(args):
 
 
 def main():
-    parser = ArgumentParser(description='MGU project #3 & DL-MAI project #2 (RNN) training script.')
+    parser = ArgumentParser(description='DL-MAI project #2 (RNN) training script.')
 
     available_models = [model_name.split("/")[1].split(".")[0] for model_name in glob("models/*.py")]
     parser.add_argument('model', choices=available_models)

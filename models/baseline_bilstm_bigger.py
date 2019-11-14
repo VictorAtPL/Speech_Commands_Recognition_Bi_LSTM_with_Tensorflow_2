@@ -1,11 +1,9 @@
 import tensorflow as tf
 
-from AbstractModel import AbstractModel
-from common import get_input_fn_and_steps_per_epoch, load_sets_count, mel_spectrogram_parser
-from constants import TFRECORDS_SAVE_PATH
+from models.baseline import Model as Baseline
 
 
-class Model(AbstractModel):
+class Model(Baseline):
 
     def get_model(self):
         input_op = tf.keras.Input(shape=(128, 44))
@@ -42,9 +40,3 @@ class Model(AbstractModel):
         output_op = layers.Dense(12)(x)
 
         return tf.keras.Model(inputs=input_op, outputs=output_op)
-
-    def get_input_fn_and_steps_per_epoch(self, set_name, batch_size):
-        sets_count = load_sets_count()
-
-        return get_input_fn_and_steps_per_epoch(set_name, mel_spectrogram_parser, TFRECORDS_SAVE_PATH,
-                                                batch_size, sets_count)

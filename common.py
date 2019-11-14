@@ -8,7 +8,7 @@ import tensorflow as tf
 from constants import TFRECORDS_FORMAT_PATTERN, TFRECORDS_SAVE_PATH
 
 
-def mel_spectrogram_parser(serialized_example):
+def mel_spectrogram_labeled_parser(serialized_example):
     features = tf.io.parse_single_example(
         serialized_example,
         features={
@@ -19,6 +19,10 @@ def mel_spectrogram_parser(serialized_example):
     features["samples"] = tf.reshape(features["samples"], [128, 44])  # * (2. / 255) - 1
 
     return features["samples"], features["label"]
+
+
+def mel_spectrogram_unlabeled_parser(serialized_example):
+    return mel_spectrogram_labeled_parser(serialized_example)[0]
 
 
 def make_input_local(filenames, parser_fn, shuffle=False, repeat=False):
@@ -35,7 +39,8 @@ def make_input_local(filenames, parser_fn, shuffle=False, repeat=False):
         if shuffle:
             dataset = dataset.shuffle(buffer_size=70000, reshuffle_each_iteration=True)
 
-        dataset = dataset.batch(batch_size)
+        if batch_size:
+            dataset = dataset.batch(batch_size)
 
         if repeat:
             dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
@@ -46,9 +51,11 @@ def make_input_local(filenames, parser_fn, shuffle=False, repeat=False):
 
 
 def get_input_fn_and_steps_per_epoch(set_name, parser_fn, tfrecords_path, batch_size, sets_count):
-    assert set_name in ('train', 'validation', 'test')
+    assert set_name in ('train', 'validation', 'test', 'prediction')
 
-    steps_per_epoch = math.ceil(sets_count[set_name] / batch_size)
+    steps_per_epoch = None
+    if batch_size:
+        steps_per_epoch = math.ceil(sets_count[set_name] / batch_size)
 
     generator = make_input_local(
         glob(os.path.join(tfrecords_path, TFRECORDS_FORMAT_PATTERN.format(set_name, '*', '*'))),

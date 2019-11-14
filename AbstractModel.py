@@ -10,5 +10,5 @@ class AbstractModel(ABC):
         pass
 
     @abstractmethod
-    def get_input_fn_and_steps_per_epoch(self, set_name, batch_size):
+    def get_input_fn_and_steps_per_epoch(self, set_name, batch_size=None):
         pass
