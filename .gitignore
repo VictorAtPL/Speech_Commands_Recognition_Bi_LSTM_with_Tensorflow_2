@@ -5,3 +5,6 @@ train/
 test/
 *.pickle
 __pycache__/
+*.csv
+logs/
+*.ipynb
